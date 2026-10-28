@@ -351,6 +351,19 @@ describe("goal runtime", () => {
 		expect(lastEvent.state?.enabled).toBe(false);
 	});
 
+	it("keeps goal-tool authorization tied to user goal lifecycle", async () => {
+		const harness = createHarness();
+		expect(harness.runtime.isUserAuthorized()).toBe(false);
+		await harness.runtime.createGoal({ objective: "authorized" });
+		expect(harness.runtime.isUserAuthorized()).toBe(true);
+		await harness.runtime.pauseGoal();
+		expect(harness.runtime.isUserAuthorized()).toBe(false);
+		await harness.runtime.resumeGoal();
+		expect(harness.runtime.isUserAuthorized()).toBe(true);
+		await harness.runtime.dropGoal();
+		expect(harness.runtime.isUserAuthorized()).toBe(false);
+	});
+
 	it("replaces an active goal with a fresh active goal", async () => {
 		const harness = createHarness({
 			state: {
