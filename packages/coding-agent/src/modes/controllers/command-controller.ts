@@ -2284,9 +2284,14 @@ export class CommandController {
 		}
 
 		let outcome: CompactionOutcome = "ok";
+		// Compaction is a new conversation prefix. Drop the pre-compaction cache
+		// baseline so the first post-compaction turn is not compared against the
+		// old (much larger) cacheRead.
+		this.ctx.lastAssistantUsage = undefined;
 		try {
 			try {
 				await session.compact(instructions, options);
+				this.ctx.lastAssistantUsage = undefined;
 			} finally {
 				if (compactingLoader) {
 					compactingLoader.stop();
@@ -2295,6 +2300,7 @@ export class CommandController {
 			}
 			if (inView()) {
 				this.ctx.rebuildChatFromMessages({ reuseSettledComponents: true });
+				this.ctx.lastAssistantUsage = undefined;
 				this.ctx.statusLine.invalidate();
 				if (background) this.ctx.showStatus("Compaction complete");
 				// Rebuilding resets the transcript's emission ledger. Clear terminal
@@ -2317,6 +2323,7 @@ export class CommandController {
 		if (!background) await this.ctx.flushCompactionQueue({ willRetry: false });
 		return outcome;
 	}
+
 }
 
 const BAR_WIDTH_MAX = 24;
