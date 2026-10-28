@@ -190,7 +190,7 @@ describe("AssistantMessageComponent transcript lifecycle", () => {
 		transcript.addChild(component);
 		transcript.renderViewport(80, 20, { now: 0, tick: 0 });
 
-		component.setCacheInvalidation({ reprocessedTokens: 50_000 });
+		component.setCacheInvalidation({ lostTokens: 50_000, full: true });
 		component.markTranscriptBlockFinalized();
 
 		const batch = transcript.peekFlushBatch(80);
