@@ -12,6 +12,19 @@ export const cfgGoalEnabled = register({
 	},
 });
 
+export const cfgGoalPreloadTool = register({
+	id: "goal.preloadTool",
+	type: "boolean",
+	default: false,
+	ui: {
+		tab: "tasks",
+		group: "Modes",
+		label: "Preload Goal Tool",
+		description:
+			"Advertise the goal tool from session start so the tool schema stays cache-stable. Execution stays locked until the user starts /goal or /guided-goal.",
+	},
+});
+
 export const cfgGoalStatusInFooter = register({
 	id: "goal.statusInFooter",
 	type: "boolean",
