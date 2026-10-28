@@ -403,7 +403,7 @@ describe("native transcript", () => {
 					{ type: "text", text: "Done. See `make`." },
 				]),
 			);
-			reply.setCacheInvalidation({ reprocessedTokens: 50_000 });
+			reply.setCacheInvalidation({ lostTokens: 50_000, full: true });
 			container.addChild(reply);
 			const bash = new BashExecutionComponent("ls -la", h.tui);
 			bash.appendOutput("\x1b[31mred\x1b[0m output\nsecond line");

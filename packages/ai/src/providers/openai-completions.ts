@@ -68,6 +68,7 @@ import type {
 	ChatCompletionAssistantMessageParam,
 	ChatCompletionChunk,
 	ChatCompletionContentPart,
+	ChatCompletionContentPartDeepSeekFile,
 	ChatCompletionContentPartImage,
 	ChatCompletionContentPartText,
 	ChatCompletionMessageFunctionToolCall,
@@ -2528,14 +2529,22 @@ export function convertMessages(
 							text,
 						} satisfies ChatCompletionContentPartText);
 					} else if (supportsImages) {
-						content.push({
-							type: "image_url",
-							image_url: {
-								url: item.url ?? `data:${item.mimeType};base64,${item.data}`,
-								// Chat Completions has no "original"; omit it (provider default).
-								...(item.detail && item.detail !== "original" ? { detail: item.detail } : {}),
-							},
-						} satisfies ChatCompletionContentPartImage);
+						const providerFile = item.providerFile;
+						if (providerFile?.provider === "deepseek" && providerFile.id) {
+							content.push({
+								type: "file",
+								file_id: providerFile.id,
+							} satisfies ChatCompletionContentPartDeepSeekFile);
+						} else {
+							content.push({
+								type: "image_url",
+								image_url: {
+									url: item.url ?? `data:${item.mimeType};base64,${item.data}`,
+									// Chat Completions has no "original"; omit it (provider default).
+									...(item.detail && item.detail !== "original" ? { detail: item.detail } : {}),
+								},
+							} satisfies ChatCompletionContentPartImage);
+						}
 					} else {
 						omittedImages = true;
 					}
@@ -2819,7 +2828,7 @@ export function convertMessages(
 			params.push(assistantMsg);
 		} else if (msg.role === "toolResult") {
 			// Batch consecutive tool results and collect all images
-			const imageBlocks: Array<{ type: "image_url"; image_url: { url: string } }> = [];
+			const imageBlocks: ChatCompletionContentPart[] = [];
 			let j = i;
 
 			for (; j < transformedMessages.length && transformedMessages[j].role === "toolResult"; j++) {
@@ -2859,12 +2868,20 @@ export function convertMessages(
 				if (hasImages && supportsImages) {
 					for (const block of toolMsg.content) {
 						if (block.type === "image") {
-							imageBlocks.push({
-								type: "image_url",
-								image_url: {
-									url: block.url ?? `data:${block.mimeType};base64,${block.data}`,
-								},
-							});
+							const providerFile = block.providerFile;
+							if (providerFile?.provider === "deepseek" && providerFile.id) {
+								imageBlocks.push({
+									type: "file",
+									file_id: providerFile.id,
+								} satisfies ChatCompletionContentPartDeepSeekFile);
+							} else {
+								imageBlocks.push({
+									type: "image_url",
+									image_url: {
+										url: block.url ?? `data:${block.mimeType};base64,${block.data}`,
+									},
+								} satisfies ChatCompletionContentPartImage);
+							}
 						}
 					}
 				}

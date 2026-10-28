@@ -161,19 +161,6 @@ export const cfgExtensionHandlersToolCallTimeoutMs = register({
 	},
 });
 
-export const cfgExtensionHandlersModeControl = register({
-	id: "extensionHandlers.modeControl",
-	type: "boolean",
-	default: true,
-	ui: {
-		tab: "tools",
-		group: "Extensions",
-		label: "Extension Mode Control",
-		description:
-			"Let extensions enter and exit plan, vibe, goal, and loop modes via ctx.sessionModes.set(); reading mode state stays available",
-	},
-});
-
 export const cfgExtensionAssistantTextRenderers = register({
 	id: "extensionRenderers.assistantText",
 	type: "boolean",

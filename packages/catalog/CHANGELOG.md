@@ -142,6 +142,9 @@
 ### Fixed
 
 - Gemma 4 models on Google AI Studio (`google/gemma-4-31b-it`, `google/gemma-4-26b-a4b-it`, …) no longer fail every request with `Thinking budget is not supported for this model`; thinking is now toggled with `thinkingLevel` (on = `high`, off = `minimal`) ([#16350](https://github.com/can1357/oh-my-pi/issues/16350))
+### Fixed
+
+- DeepSeek's official endpoint now declares its documented 600-image request limit and a 40 MiB inline-image budget; the unassigned-host floor of 5 made screenshot sessions evict warm images and rewrite the prompt cache
 
 ## [18.12.2] - 2026-10-18
 

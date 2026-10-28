@@ -391,6 +391,11 @@ function sendsInlineImageBytes(image: ImageContent, model: Model): boolean {
 					return false;
 				}
 				break;
+			case "deepseek":
+				if (reference.id && (model.api === "openai-completions" || model.api === "openai-responses")) {
+					return false;
+				}
+				break;
 		}
 	}
 	if (image.url && supportsRemoteImageUrls(model)) return false;

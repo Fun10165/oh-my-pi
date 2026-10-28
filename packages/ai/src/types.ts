@@ -954,7 +954,7 @@ export interface AnthropicServerToolContent {
 
 /** Provider-native uploaded file reference for image reuse without retransmitting bytes. */
 export interface ProviderFileReference {
-	provider: "openai" | "anthropic" | "google";
+	provider: "openai" | "anthropic" | "google" | "deepseek";
 	id?: string;
 	uri?: string;
 	expiresAt?: number;

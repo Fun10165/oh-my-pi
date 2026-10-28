@@ -6,7 +6,7 @@ import { isEnoent } from "@oh-my-pi/pi-utils";
 import type { RemoteDeleteAction } from "./publication";
 
 /** Model providers whose official APIs support reusable uploaded-file references. */
-export type ProviderFileProvider = "openai" | "anthropic" | "google";
+export type ProviderFileProvider = "openai" | "anthropic" | "google" | "deepseek";
 
 /** Immutable bytes supplied to a provider-native file client. */
 export interface ProviderFileUploadRequest {
@@ -114,7 +114,7 @@ const PersistedDeleteActionSchema = type({
 	"body?": "string",
 });
 const PersistedHandleSchema = type({
-	provider: "'openai' | 'anthropic' | 'google'",
+	provider: "'openai' | 'anthropic' | 'google' | 'deepseek'",
 	"id?": "string > 0",
 	"uri?": "string > 0",
 	mimeType: "string > 0",
@@ -123,7 +123,7 @@ const PersistedHandleSchema = type({
 	delete: PersistedDeleteActionSchema,
 });
 const PersistedEntrySchema = type({
-	provider: "'openai' | 'anthropic' | 'google'",
+	provider: "'openai' | 'anthropic' | 'google' | 'deepseek'",
 	credentialHash: "string > 0",
 	contentHash: "string > 0",
 	handle: PersistedHandleSchema,
@@ -327,7 +327,7 @@ export class ProviderFileCache {
 	/** Return current counts and persistence state for CLI presentation. */
 	status(): ProviderFileCacheStatus {
 		this.purgeExpired();
-		const providers: Record<ProviderFileProvider, number> = { openai: 0, anthropic: 0, google: 0 };
+		const providers: Record<ProviderFileProvider, number> = { openai: 0, anthropic: 0, google: 0, deepseek: 0 };
 		let bytes = 0;
 		for (const entry of this.#entries.values()) {
 			providers[entry.provider]++;
