@@ -33,6 +33,7 @@ import type { LazyBlobFetcher } from "./store";
 import type { DestinationOptionValue } from "./uploader-runtime";
 
 import {
+	cfgImagesProviderFilesEnabled,
 	cfgImagesUrlsBackends,
 	cfgImagesUrlsBindHost,
 	cfgImagesUrlsCommand,
@@ -730,25 +731,37 @@ export function createImageUrlServiceFromSettings(
 	projectDir: string,
 	resolveCredential: ProviderFileCredentialResolver,
 ): ImageUrlService | undefined {
-	if (!cfgImagesUrlsEnabled.get(settings)) return undefined;
-	const configs = resolveBlobBrokerConfigs(settings, projectDir);
+	const urlsEnabled = cfgImagesUrlsEnabled.get(settings);
+	const providerFilesEnabled = cfgImagesProviderFilesEnabled.get(settings);
+	if (!urlsEnabled && !providerFilesEnabled) return undefined;
+	const configs = urlsEnabled ? resolveBlobBrokerConfigs(settings, projectDir) : [];
 	let providerFilePosition: number | undefined;
-	let urlPosition = 0;
-	for (const destination of cfgImagesUrlsBackends.get(settings)) {
-		if (destination === "provider-files") providerFilePosition ??= urlPosition;
-		else urlPosition++;
+	if (urlsEnabled) {
+		let urlPosition = 0;
+		for (const destination of cfgImagesUrlsBackends.get(settings)) {
+			if (destination === "provider-files") providerFilePosition ??= urlPosition;
+			else urlPosition++;
+		}
 	}
+	// Provider-native uploads are independent of public URL publication: when
+	// URLs are disabled they still run first (position 0) over an empty backend list.
+	if (providerFilePosition === undefined && providerFilesEnabled) providerFilePosition = 0;
 	if (configs.length === 0 && providerFilePosition === undefined) {
 		logger.warn("blob-broker: no configured image backend is available; images stay inline");
 		return undefined;
 	}
 	const savingsJournal = new BlobBrokerSavingsJournal(blobBrokerSavingsJournalPath(settings, projectDir));
+	// With URL publication off, provider-file uploads default to DeepSeek only;
+	// other native file providers stay opt-in through images.urls.enabled.
+	const defaultProviderFiles: Readonly<Record<string, true>> = { deepseek: true };
 	const providerFiles =
 		providerFilePosition === undefined
 			? undefined
 			: new ProviderFileManager(
 					new ProviderFileCache(providerFileCachePath(settings, projectDir)),
 					resolveCredential,
+					undefined,
+					urlsEnabled ? undefined : defaultProviderFiles,
 				);
 	return new ImageUrlService(projectDir, configs, {
 		providerFiles,
