@@ -34,6 +34,7 @@ import {
 	type ProviderFileProvider,
 } from "../blob-broker/provider-file-types";
 import { createAnthropicFileClient } from "../blob-broker/provider-files-anthropic";
+import { createDeepSeekFileClient } from "../blob-broker/provider-files-deepseek";
 import { createGeminiProviderFileClient } from "../blob-broker/provider-files-gemini";
 import { createOpenAIFileClient } from "../blob-broker/provider-files-openai";
 import {
@@ -45,7 +46,7 @@ import { providerFileCachePath, resolveBlobBrokerConfigs } from "../blob-broker/
 import { createConfiguredUploader } from "../blob-broker/uploaders";
 import { Settings } from "../config/settings";
 
-import { cfgImagesUrlsBackends, cfgImagesUrlsEnabled } from "../blob-broker/settings";
+import { cfgImagesProviderFilesEnabled, cfgImagesUrlsBackends, cfgImagesUrlsEnabled } from "../blob-broker/settings";
 
 export const IMAGES_ACTIONS = ["status", "doctor", "probe", "purge"] as const;
 export type ImagesAction = (typeof IMAGES_ACTIONS)[number];
@@ -64,6 +65,7 @@ export interface ImagesCommandArgs {
 
 export interface ImagesResolvedConfig {
 	readonly enabled: boolean;
+	readonly providerFilesEnabled: boolean;
 	readonly orderedBackends: readonly BlobDestinationId[];
 	readonly configs: readonly BlobBrokerWorkerConfig[];
 	readonly providerFileCachePath: string;
@@ -207,8 +209,10 @@ const BINARY_BY_DESTINATION: Readonly<Partial<Record<BlobDestinationId, string>>
 };
 
 function defaultResolveConfig(settings: Settings, projectDir: string): ImagesResolvedConfig {
+	const providerFilesEnabled = cfgImagesProviderFilesEnabled.get(settings);
 	return {
-		enabled: cfgImagesUrlsEnabled.get(settings),
+		enabled: cfgImagesUrlsEnabled.get(settings) || providerFilesEnabled,
+		providerFilesEnabled,
 		orderedBackends: cfgImagesUrlsBackends.get(settings),
 		configs: resolveBlobBrokerConfigs(settings, projectDir),
 		providerFileCachePath: providerFileCachePath(settings, projectDir),
@@ -227,7 +231,9 @@ function defaultCreateProviderFileClient(
 				? createOpenAIFileClient(model, credential, fetchImpl)
 				: provider === "anthropic"
 					? createAnthropicFileClient(model, credential, fetchImpl)
-					: createGeminiProviderFileClient(model, credential, fetchImpl);
+					: provider === "deepseek"
+						? createDeepSeekFileClient(model, credential, fetchImpl)
+						: createGeminiProviderFileClient(model, credential, fetchImpl);
 		if (client) return client;
 	}
 	return null;
@@ -245,7 +251,10 @@ function persistedProviderFileEntry(value: unknown): ProviderFileCacheEntry | un
 	const entry = value as Partial<ProviderFileCacheEntry>;
 	const handle = entry.handle;
 	if (
-		(entry.provider !== "openai" && entry.provider !== "anthropic" && entry.provider !== "google") ||
+		(entry.provider !== "openai" &&
+			entry.provider !== "anthropic" &&
+			entry.provider !== "google" &&
+			entry.provider !== "deepseek") ||
 		typeof entry.credentialHash !== "string" ||
 		!/^[0-9a-f]{64}$/.test(entry.credentialHash) ||
 		typeof entry.contentHash !== "string" ||
@@ -355,7 +364,7 @@ function publicStatus(status: BlobBrokerStatus | null): SafeDaemonStatus {
 }
 
 function providerFileStatus(indexPath: string, snapshot: ImagesProviderFileSnapshot): ProviderFileCacheStatus {
-	const providers: Record<ProviderFileProvider, number> = { openai: 0, anthropic: 0, google: 0 };
+	const providers: Record<ProviderFileProvider, number> = { openai: 0, anthropic: 0, google: 0, deepseek: 0 };
 	let bytes = 0;
 	let entries = 0;
 	const now = Date.now();
@@ -408,9 +417,13 @@ function configChecks(config: ImagesResolvedConfig, deps: ImagesCliDependencies)
 	checks.push({
 		name: "enabled",
 		severity: config.enabled ? "ok" : "error",
-		detail: config.enabled ? "Image publication is enabled" : "images.urls.enabled is false",
+		detail: config.enabled
+			? config.providerFilesEnabled
+				? "Provider file uploads or image publication is enabled"
+				: "Image publication is enabled"
+			: "images.urls.enabled and images.providerFiles.enabled are false",
 	});
-	if (config.orderedBackends.length === 0) {
+	if (config.orderedBackends.length === 0 && !config.providerFilesEnabled) {
 		checks.push({ name: "backends", severity: "error", detail: "No image publication backends are configured" });
 	}
 	const configByKind = new Map(config.configs.map(item => [item.kind, item]));

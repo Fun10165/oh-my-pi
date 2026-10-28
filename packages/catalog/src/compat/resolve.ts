@@ -592,8 +592,12 @@ function detectOpenAICompat(
 		stripDeepseekSpecialTokens: false,
 		// Present as a key so models.yml `compat` can set it; unset unless a rule assigns it.
 		stripThinkingHistory: undefined,
-		// URL-derived like the Responses field; unset off the official OpenAI API.
-		officialEndpoint: isOfficialOpenAIEndpoint(spec.provider, baseUrl) || undefined,
+		// URL-derived like the Responses field; unset off the official OpenAI/DeepSeek APIs.
+		officialEndpoint:
+			isOfficialOpenAIEndpoint(spec.provider, baseUrl) ||
+			(spec.provider === "deepseek" &&
+				(!baseUrl || (URL.canParse(baseUrl) && new URL(baseUrl).hostname === "api.deepseek.com"))) ||
+			undefined,
 		streamMarkupHealingPattern: detectStreamMarkupHealing(spec.provider, facts, baseUrl),
 		reasoningDeltasMayBeCumulative: false,
 		emptyLengthFinishIsContextError: false,

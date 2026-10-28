@@ -24,7 +24,6 @@ import type {
 	CompactOptions,
 	ExtensionLiveSession,
 	ExtensionLiveStartOptions,
-	ExtensionSessionModes,
 	PlanReviewChoice,
 	PlanReviewRequestedEvent,
 } from "../extensibility/extensions/types";
@@ -697,7 +696,6 @@ export interface InteractiveModeContext {
 	resolvePlanReview(reviewId: string, choice: PlanReviewChoice, input?: { feedback?: string; role?: string }): boolean;
 	getPendingPlanReview(): PlanReviewRequestedEvent | undefined;
 	openPlanReview(options?: { fromExtension?: boolean }): Promise<boolean>;
-	readonly sessionModes: ExtensionSessionModes;
 
 	// Hook UI methods
 	initHooksAndCustomTools(): Promise<void>;

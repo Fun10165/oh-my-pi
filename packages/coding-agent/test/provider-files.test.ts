@@ -577,4 +577,24 @@ describe("ProviderFileManager", () => {
 		expect(deleted).toEqual([]);
 		manager.save();
 	});
+
+	test("allowlist leaves other native file providers inline", async () => {
+		using tempDir = TempDir.createSync("@omp-provider-file-manager-allowlist-");
+		const cache = new ProviderFileCache(tempDir.join("provider-files.json"), { saveDebounceMs: 60_000 });
+		let uploadCount = 0;
+		const client: ProviderFileClient = {
+			provider: "openai",
+			async upload(): Promise<ProviderFileHandle> {
+				uploadCount++;
+				throw new Error("allowlisted provider should not upload");
+			},
+			async delete(): Promise<void> {},
+		};
+		const factory: ProviderFileClientFactory = () => client;
+		const manager = new ProviderFileManager(cache, async () => "account-a", [factory], { deepseek: true });
+		const context = contextWithRepeatedImage();
+
+		expect(await manager.decorateContext(context, openAIModel)).toBe(context);
+		expect(uploadCount).toBe(0);
+	});
 });
