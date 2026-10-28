@@ -121,6 +121,12 @@ export class GoalRuntime {
 	#wallClock: GoalWallClockSnapshot;
 	#budgetReportedFor: string | undefined;
 	#accountingTail: Promise<void> = Promise.resolve();
+	/**
+	 * The goal tool may be advertised before goal mode starts so its schema stays
+	 * cache-stable. This flag records that the user, not the model, opened that
+	 * door via /goal or /guided-goal.
+	 */
+	#userAuthorized = false;
 
 	constructor(host: GoalRuntimeHost) {
 		this.#host = host;
@@ -139,6 +145,19 @@ export class GoalRuntime {
 
 	#now(): number {
 		return this.#host.now?.() ?? Date.now();
+	}
+
+	/** Called only from user-initiated goal entry paths, never from the goal tool. */
+	authorizeUser(): void {
+		this.#userAuthorized = true;
+	}
+
+	clearUserAuthorization(): void {
+		this.#userAuthorized = false;
+	}
+
+	isUserAuthorized(): boolean {
+		return this.#userAuthorized;
 	}
 
 	#hasAccountingState(): boolean {
@@ -200,6 +219,7 @@ export class GoalRuntime {
 		this.#turnSnapshot = undefined;
 		this.#clearActiveAccounting();
 		this.#budgetReportedFor = undefined;
+		this.#userAuthorized = false;
 	}
 
 	onTurnStart(turnId: string, baselineUsage: GoalTokenUsage): void {
@@ -255,6 +275,7 @@ export class GoalRuntime {
 			if (options?.reason !== "interrupted") return;
 			const cloned = this.#getStateClone();
 			if (!cloned?.enabled || cloned.goal.status !== "active") return;
+			this.#userAuthorized = false;
 			cloned.enabled = false;
 			cloned.goal.status = "paused";
 			cloned.goal.updatedAt = this.#now();
@@ -267,6 +288,7 @@ export class GoalRuntime {
 	async onThreadResumed(options?: { preserveActiveGoal?: boolean }): Promise<GoalModeState | undefined> {
 		const state = this.#getStateClone();
 		if (!state) return undefined;
+		this.#userAuthorized = state.enabled === true;
 		if (options?.preserveActiveGoal && state.enabled && state.goal.status === "active") {
 			this.#markActiveAccounting(state.goal, true);
 			await this.#commitState(state, { emit: true });
@@ -399,6 +421,7 @@ export class GoalRuntime {
 			if (existing?.goal && existing.goal.status !== "dropped" && existing.goal.status !== "complete") {
 				throw new Error("cannot create a new goal because this session already has a goal");
 			}
+			this.#userAuthorized = true;
 			const state = this.#createGoalState(objective, input.tokenBudget);
 			this.#budgetReportedFor = undefined;
 			this.#markActiveAccounting(state.goal);
@@ -417,6 +440,7 @@ export class GoalRuntime {
 				throw new Error("cannot replace goal because no goal is active");
 			}
 			await this.#flushUsageLocked("suppressed");
+			this.#userAuthorized = true;
 			const state = this.#createGoalState(objective, input.tokenBudget);
 			this.#budgetReportedFor = undefined;
 			this.#markActiveAccounting(state.goal);
@@ -430,6 +454,7 @@ export class GoalRuntime {
 			const state = this.#getStateClone();
 			if (!state?.goal) throw new Error("No paused goal.");
 			if (state.goal.status === "complete") throw new Error("Goal is already complete.");
+			this.#userAuthorized = true;
 			state.enabled = true;
 			state.mode = "active";
 			state.reason = undefined;
@@ -447,6 +472,7 @@ export class GoalRuntime {
 			await this.#flushUsageLocked("suppressed");
 			const state = this.#getStateClone();
 			if (!state?.goal) return undefined;
+			this.#userAuthorized = false;
 			state.enabled = false;
 			state.mode = "active";
 			state.reason = undefined;
@@ -466,6 +492,7 @@ export class GoalRuntime {
 			await this.#flushUsageLocked("suppressed");
 			const state = this.#getStateClone();
 			if (!state?.goal) return undefined;
+			this.#userAuthorized = false;
 			const dropped = { ...state.goal, status: "dropped" as const, updatedAt: this.#now() };
 			this.#clearActiveAccounting();
 			this.#budgetReportedFor = undefined;
@@ -492,6 +519,7 @@ export class GoalRuntime {
 			if (state.goal.status === "dropped") {
 				throw new Error("cannot complete a dropped goal");
 			}
+			this.#userAuthorized = false;
 			state.enabled = false;
 			state.goal.status = "complete";
 			state.goal.updatedAt = this.#now();
