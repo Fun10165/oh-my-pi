@@ -94,3 +94,12 @@ packages/coding-agent/bench/boot-baseline.json
 /.bazelrc.user
 
 .parity/
+
+# Generated agent databases accidentally present in the v18.13.3 tag
+packages/coding-agent/auth.db
+packages/coding-agent/auth.db-shm
+packages/coding-agent/auth.db-wal
+packages/coding-agent/models.db
+packages/coding-agent/skill-descriptions.db
+packages/coding-agent/skill-descriptions.db-shm
+packages/coding-agent/skill-descriptions.db-wal

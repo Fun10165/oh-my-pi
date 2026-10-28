@@ -12,7 +12,7 @@
  * component reuse could.
  */
 import type { AgentMessage, AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { Usage } from "@oh-my-pi/pi-ai";
+import type { AssistantMessage, Usage } from "@oh-my-pi/pi-ai";
 import { type Component, type TUI } from "../tui";
 import type { AdvisorMessageDetails } from "./messages";
 import { COLLAB_PROMPT_MESSAGE_TYPE, type CollabPromptDetails } from "./messages";
@@ -426,7 +426,9 @@ export class ChatTranscriptBuilder {
 		let lastAssistantComponent = assistantComponent;
 
 		if (displayPreferences.cacheMissMarker) {
-			const invalidation = detectCacheInvalidation(this.#lastAssistantUsage, message.usage);
+			const invalidation = detectCacheInvalidation(this.#lastAssistantUsage, message.usage, {
+				api: message.api,
+			});
 			if (invalidation) assistantComponent.setCacheInvalidation(invalidation);
 		}
 		if (message.usage.cacheRead + message.usage.cacheWrite + message.usage.input > 0) {

@@ -9,7 +9,7 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 import { cfgAsyncEnabled, cfgToolsXdev } from "@oh-my-pi/pi-coding-agent/tools/settings";
-import { cfgGoalEnabled } from "@oh-my-pi/pi-coding-agent/goals/settings";
+import { cfgGoalEnabled, cfgGoalPreloadTool } from "@oh-my-pi/pi-coding-agent/goals/settings";
 
 describe("goal tool registration when goal mode is enabled at runtime", () => {
 	let tempDir: TempDir;
@@ -28,7 +28,7 @@ describe("goal tool registration when goal mode is enabled at runtime", () => {
 		resetSettingsForTest();
 	});
 
-	async function makeSession(goalEnabledAtStartup: boolean): Promise<AgentSession> {
+	async function makeSession(goalEnabledAtStartup: boolean, preloadGoalTool = false): Promise<AgentSession> {
 		const authStorage = createInMemoryAuthStorage();
 		authStorage.keys.setRuntime("anthropic", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
@@ -37,6 +37,7 @@ describe("goal tool registration when goal mode is enabled at runtime", () => {
 		cfgAsyncEnabled.set(settings, false);
 		cfgToolsXdev.set(settings, true);
 		cfgGoalEnabled.set(settings, goalEnabledAtStartup);
+		cfgGoalPreloadTool.set(settings, preloadGoalTool);
 		const { session: created } = await createAgentSession({
 			cwd: tempDir.path(),
 			agentDir: tempDir.path(),
@@ -75,6 +76,23 @@ describe("goal tool registration when goal mode is enabled at runtime", () => {
 		session = await makeSession(true);
 		await enterGoalMode(session);
 		expect(session.getEnabledToolNames()).toContain("goal");
+	});
+
+	it("preloads the goal tool from session start", async () => {
+		session = await makeSession(true, true);
+		expect(session.getEnabledToolNames()).toContain("goal");
+	});
+
+	it("locks a preloaded goal tool until the user authorizes goal mode", async () => {
+		session = await makeSession(true, true);
+		const goalTool = session.agent.state.tools.find(tool => tool.name === "goal");
+		expect(goalTool).toBeDefined();
+		const params = { op: "get" as const, objective: undefined, token_budget: undefined };
+		await expect(goalTool!.execute("call_locked", params)).rejects.toThrow("locked");
+
+		session.goalRuntime.authorizeUser();
+		const result = await goalTool!.execute("call_authorized", params);
+		expect(result.details).toMatchObject({ op: "get", goal: null });
 	});
 
 	it("exposes the goal tool when goal.enabled is turned on after session start", async () => {

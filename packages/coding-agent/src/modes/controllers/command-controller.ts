@@ -2135,6 +2135,10 @@ export class CommandController {
 		this.ctx.ui.requestRender();
 
 		let outcome: CompactionOutcome = "ok";
+		// Compaction is a new conversation prefix. Drop the pre-compaction cache
+		// baseline so the first post-compaction turn is not compared against the
+		// old (much larger) cacheRead.
+		this.ctx.lastAssistantUsage = undefined;
 		try {
 			const instructions = typeof customInstructionsOrOptions === "string" ? customInstructionsOrOptions : undefined;
 			const baseOptions =
@@ -2149,10 +2153,14 @@ export class CommandController {
 					? { ...baseOptions, ...(effectiveMode ? { mode: effectiveMode } : {}) }
 					: undefined;
 			await this.ctx.session.compact(instructions, options);
+			this.ctx.lastAssistantUsage = undefined;
 
 			compactingLoader.stop();
 			this.ctx.statusContainer.disposeChildren();
 			this.ctx.rebuildChatFromMessages({ reuseSettledComponents: true });
+			// The rebuild reseeds from the last replayed assistant; clear it after
+			// the rebuild so the first post-compaction turn starts a new prefix.
+			this.ctx.lastAssistantUsage = undefined;
 
 			this.ctx.statusLine.invalidate();
 			// Same pairing as the auto-compaction arm in event-controller: the
@@ -2230,6 +2238,7 @@ export class CommandController {
 			// Rebuild chat from the session, which now shows the handoff compaction divider.
 			this.ctx.clearTransientSessionUi();
 			await this.ctx.renderInitialMessages();
+			this.ctx.lastAssistantUsage = undefined;
 			this.ctx.statusLine.invalidate();
 			this.ctx.updateEditorBorderColor();
 			await this.ctx.reloadTodos();
