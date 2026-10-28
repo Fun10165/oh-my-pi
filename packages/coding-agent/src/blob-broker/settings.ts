@@ -35,6 +35,19 @@ export const cfgImagesUrlsEnabled = register({
 	},
 });
 
+export const cfgImagesProviderFilesEnabled = register({
+	id: "images.providerFiles.enabled",
+	type: "boolean",
+	default: true,
+	ui: {
+		tab: "model",
+		group: "Vision",
+		label: "Provider File Uploads",
+		description:
+			"Upload DeepSeek images once to the provider's Files API and send file references on later turns by default. API-local; other native file providers opt in with images.urls.enabled; does not publish public URLs",
+	},
+});
+
 export const cfgImagesUrlsBackends = register({
 	id: "images.urls.backends",
 	type: "array",
@@ -139,6 +152,7 @@ export const cfgImagesUrlsSshRemotePort = register({
 /** Every `images.urls.*` setting; the live image URL service rebuilds when any changes. */
 export const cfgImagesUrls = combine({
 	enabled: cfgImagesUrlsEnabled,
+	providerFiles: cfgImagesProviderFilesEnabled,
 	backends: cfgImagesUrlsBackends,
 	options: cfgImagesUrlsOptions,
 	credentials: cfgImagesUrlsCredentials,

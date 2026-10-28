@@ -12,11 +12,15 @@ import {
 	toProviderFileReference,
 } from "./provider-file-types";
 import { createAnthropicFileClient } from "./provider-files-anthropic";
+import { createDeepSeekFileClient } from "./provider-files-deepseek";
 import { createGeminiProviderFileClient } from "./provider-files-gemini";
 import { createOpenAIFileClient } from "./provider-files-openai";
 
 /** Resolve the current account credential for a model without retaining it. */
 export type ProviderFileCredentialResolver = (model: Model) => Promise<string | undefined>;
+
+/** Providers allowed to use the native file path; unset allows every factory. */
+export type ProviderFileAllowlist = Readonly<Record<string, true>>;
 
 /** Select a provider-native file client for a model and resolved credential. */
 export type ProviderFileClientFactory = (model: Model, credential: string) => ProviderFileClient | null;
@@ -25,6 +29,7 @@ const DEFAULT_CLIENT_FACTORIES: readonly ProviderFileClientFactory[] = [
 	createGeminiProviderFileClient,
 	createAnthropicFileClient,
 	createOpenAIFileClient,
+	createDeepSeekFileClient,
 ];
 
 function imageBlocks(context: Context): ImageContent[] {
@@ -86,20 +91,25 @@ export class ProviderFileManager {
 	readonly #cache: ProviderFileCache;
 	readonly #resolveCredential: ProviderFileCredentialResolver;
 	readonly #factories: readonly ProviderFileClientFactory[];
+	readonly #allowlist: ProviderFileAllowlist | undefined;
 	readonly #uploads = new Map<string, Promise<ProviderFileHandle>>();
 
 	constructor(
 		cache: ProviderFileCache,
 		resolveCredential: ProviderFileCredentialResolver,
 		factories: readonly ProviderFileClientFactory[] = DEFAULT_CLIENT_FACTORIES,
+		allowlist?: ProviderFileAllowlist,
 	) {
 		this.#cache = cache;
 		this.#resolveCredential = resolveCredential;
 		this.#factories = factories;
+		this.#allowlist = allowlist;
 	}
 
 	async decorateContext(context: Context, model: Model): Promise<Context> {
-		if (!model.input.includes("image") || !contextHasImages(context)) return context;
+		const stripsImages =
+			model.compat !== undefined && "stripImageInput" in model.compat && model.compat.stripImageInput === true;
+		if (!model.input.includes("image") || stripsImages || !contextHasImages(context)) return context;
 		const images = imageBlocks(context);
 		if (!images.some(block => !block.url && block.data.length > 0)) return context;
 
@@ -204,7 +214,9 @@ export class ProviderFileManager {
 	#clientFor(model: Model, credential: string): ProviderFileClient | null {
 		for (const factory of this.#factories) {
 			const client = factory(model, credential);
-			if (client) return client;
+			if (!client) continue;
+			if (this.#allowlist && this.#allowlist[client.provider] !== true) continue;
+			return client;
 		}
 		return null;
 	}

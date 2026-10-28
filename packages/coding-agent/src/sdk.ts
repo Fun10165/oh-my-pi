@@ -394,7 +394,7 @@ import {
 import { cfgTtsr } from "./export/ttsr-settings";
 import { cfgDisabledProviders, cfgEnabledModels, cfgEnabledProviders, cfgModelRoles } from "./config/model-settings";
 import { cfgEditRecoverInlineEdits } from "./edit/settings";
-import { cfgGoalEnabled } from "./goals/settings";
+import { cfgGoalEnabled, cfgGoalPreloadTool } from "./goals/settings";
 import {
 	cfgImagesBlockImages,
 	cfgStartupQuiet,
@@ -4458,7 +4458,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				return tool?.defaultInactive === true || tool?.hidden === true;
 			}),
 		);
-		const requestedActiveToolNames = normalizedRequested.filter(name => name !== "goal");
+		const preloadGoalTool = cfgGoalPreloadTool.get(settings);
+		const requestedActiveToolNames = normalizedRequested.filter(name => name !== "goal" || preloadGoalTool);
 		const explicitlyRequestedToolNameSet = explicitlyRequestedToolNames
 			? new Set(explicitlyRequestedToolNames)
 			: undefined;
@@ -4477,7 +4478,9 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				toolSession.deviceOnlyWrite === true);
 		const initialRequestedActiveToolNames = options.toolNames
 			? requestedActiveToolNames
-			: requestedActiveToolNames.filter(name => !defaultInactiveToolNames.has(name));
+			: requestedActiveToolNames.filter(
+					name => !defaultInactiveToolNames.has(name) || (preloadGoalTool && name === "goal"),
+				);
 		let initialToolNames = [...initialRequestedActiveToolNames];
 
 		// Custom tools and extension-registered tools are always included
