@@ -1662,6 +1662,17 @@ describe("archive helpers", () => {
 		expect(snapcompact.MAX_FRAMES_DEFAULT).toBeLessThanOrEqual(
 			snapcompact.providerImageBudget(getBundledModel("anthropic", "claude-haiku-4-5")),
 		);
+		// DeepSeek's official vision API accepts 600 images per request; the old
+		// unassigned-host floor of 5 made normal screenshot sessions evict images.
+		expect(
+			snapcompact.providerImageBudget(buildModel({ ...toModelSpec(getBundledModel("deepseek", "deepseek-flash")) })),
+		).toBe(600);
+		// A custom base URL keeps the conservative floor: its real limit is unknown.
+		const proxied = buildModel({
+			...toModelSpec(getBundledModel("deepseek", "deepseek-flash")),
+			baseUrl: "https://deepseek-proxy.example.com",
+		});
+		expect(snapcompact.providerImageBudget(proxied)).toBe(snapcompact.DEFAULT_PROVIDER_IMAGE_BUDGET);
 	});
 });
 

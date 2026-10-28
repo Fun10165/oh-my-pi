@@ -1872,8 +1872,9 @@ function clampResponsesImageDetail(
 
 function convertResponsesInputImage(image: ImageContent, supportsImageDetailOriginal: boolean): ResponseInputImage {
 	const detail = clampResponsesImageDetail(image.detail, supportsImageDetailOriginal);
-	if (image.providerFile?.provider === "openai" && image.providerFile.id) {
-		return { type: "input_image", detail, file_id: image.providerFile.id };
+	const providerFile = image.providerFile;
+	if ((providerFile?.provider === "openai" || providerFile?.provider === "deepseek") && providerFile.id) {
+		return { type: "input_image", detail, file_id: providerFile.id };
 	}
 	return {
 		type: "input_image",

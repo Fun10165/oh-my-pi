@@ -100,7 +100,7 @@ import { cfgBashEnabled } from "../exec/settings";
 import { cfgCompactionExperimentalContextManagement } from "../session/context-settings";
 import { cfgPythonInterpreter } from "../eval/settings";
 import { cfgExternalThinking } from "../session/settings";
-import { cfgGoalEnabled } from "../goals/settings";
+import { cfgGoalEnabled, cfgGoalPreloadTool } from "../goals/settings";
 import { cfgLspEnabled } from "../lsp/settings";
 import { cfgMemoryBackend } from "../memory-backend/settings";
 import { cfgTaskMaxRecursionDepth } from "../task/settings";
@@ -637,6 +637,7 @@ export async function resolveBuiltinToolPlan(session: ToolSession, toolNames?: s
 			? normalizeToolNames(toolNames)
 			: undefined;
 	const goalEnabled = cfgGoalEnabled.get(session.settings);
+	const goalPreload = !restrictToolNames && goalEnabled && cfgGoalPreloadTool.get(session.settings);
 	const goalModeActive = !restrictToolNames && goalEnabled && session.getGoalModeState?.()?.enabled === true;
 	const externalThinkingActive =
 		cfgExternalThinking.get(session.settings) && supportsExternalThinking(session.getActiveModel?.());
@@ -698,6 +699,9 @@ export async function resolveBuiltinToolPlan(session: ToolSession, toolNames?: s
 		if (goalModeActive && !requestedTools.includes("goal")) {
 			requestedTools.push("goal");
 		}
+		if (goalPreload && !requestedTools.includes("goal")) {
+			requestedTools.push("goal");
+		}
 		if (
 			requestedTools.includes("grep") &&
 			!requestedTools.includes("ast_grep") &&
@@ -740,13 +744,14 @@ export async function resolveBuiltinToolPlan(session: ToolSession, toolNames?: s
 		}
 	}
 	const isToolAllowed = (name: string) => {
-		// Never in the default set. Explicitly activatable while goal.enabled and
-		// no goal record exists yet — /guided-goal enables it so the agent can
-		// finish the interview with `goal create`, which turns goal mode on. Once
-		// a goal record exists, only an enabled goal keeps the tool: a completed
-		// (exiting) or paused goal must stop advertising it on the next rebuild.
+		// With goal.preloadTool, keep the goal tool advertised from session start
+		// so tool-schema changes cannot evict the prompt cache; GoalTool.execute
+		// rejects calls until the user starts /goal or /guided-goal. Without
+		// preload, keep the historical behavior: only an explicit entry path
+		// advertises it, and paused/completed goals stop advertising it.
 		if (name === "goal") {
 			if (!goalEnabled || restrictToolNames) return false;
+			if (goalPreload) return true;
 			const goalState = session.getGoalModeState?.();
 			return goalState === undefined || goalState.enabled === true || goalState.goal.status === "dropped";
 		}
@@ -812,7 +817,7 @@ export async function resolveBuiltinToolPlan(session: ToolSession, toolNames?: s
 		...Object.keys(BUILTIN_TOOLS).filter(isToolAllowed),
 		...(externalThinkingActive ? ["think"] : []),
 		...(includeYield ? ["yield"] : []),
-		...(goalModeActive ? ["goal"] : []),
+		...(goalPreload || goalModeActive ? ["goal"] : []),
 	];
 	return { requestedTools, names, isAllowed: isToolAllowed };
 }

@@ -160,6 +160,7 @@ async function unixJson<T>(pathname: string, method: "GET" | "POST", body?: unkn
 function resolvedConfig(): ImagesResolvedConfig {
 	return {
 		enabled: true,
+		providerFilesEnabled: false,
 		orderedBackends: ["direct"],
 		configs: [
 			{

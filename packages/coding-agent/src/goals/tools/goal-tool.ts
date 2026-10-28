@@ -16,6 +16,7 @@ import type { ToolSession } from "../../tools";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
 
 import { completionBudgetReport, remainingTokens } from "../runtime";
+import { cfgGoalPreloadTool } from "../settings";
 import type { Goal, GoalToolDetails } from "@oh-my-pi/pi-tui/tools/goal";
 
 const goalSchema = type({
@@ -85,6 +86,15 @@ export class GoalTool implements AgentTool<typeof goalSchema, GoalToolDetails> {
 		const runtime = this.#session.getGoalRuntime?.();
 		if (!runtime) {
 			throw new ToolError("Goal mode is not active.");
+		}
+		const preloadGoalTool = this.#session.settings ? cfgGoalPreloadTool.get(this.#session.settings) : false;
+		if (preloadGoalTool) {
+			const state = this.#session.getGoalModeState?.();
+			if (!runtime.isUserAuthorized() && state?.enabled !== true) {
+				throw new ToolError(
+					"Goal tool is locked until the user explicitly starts goal mode with /goal or /guided-goal. Do not retry; ask the user to invoke one of those commands.",
+				);
+			}
 		}
 
 		let response: GoalToolResponse;

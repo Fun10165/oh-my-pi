@@ -618,7 +618,9 @@ export class UiHelpers {
 					const usage = message.usage;
 					const explained = sessionContext.cacheMissExplainedAt?.[i] ?? false;
 					if (cfgDisplayCacheMissMarker.get(this.ctx.settings) && !explained) {
-						const invalidation = detectCacheInvalidation(this.ctx.lastAssistantUsage, usage);
+						const invalidation = detectCacheInvalidation(this.ctx.lastAssistantUsage, usage, {
+							api: message.api,
+						});
 						if (invalidation) assistantComponent.setCacheInvalidation(invalidation);
 					}
 					if (usage.cacheRead + usage.cacheWrite + usage.input > 0) {
