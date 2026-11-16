@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Slash-command and skill completion now tolerates one typo in the name: a substituted, inserted, deleted, or transposed character (`/guuded`, `/guidde`, `/modle`) still surfaces the intended command below correctly typed matches.
+
 ## [18.20.1] - 2026-11-14
 
 ### Added

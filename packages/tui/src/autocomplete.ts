@@ -397,6 +397,79 @@ export function scoreCommandTextMatch(lowerPrefix: string, lowerTarget: string):
 	return subsequenceMatch(lowerPrefix, lowerTarget) ? subsequenceScore(lowerPrefix, lowerTarget) : 0;
 }
 
+/** Shortest query worth a typo scan; shorter prefixes match too many names. */
+const TYPO_MIN_QUERY_LENGTH = 5;
+
+/**
+ * Tier for a name one edit away from the query. Below every exact/prefix
+ * match (1000/900), above every subsequence and description hit: a typo can
+ * surface the intended command without moving ahead of a command the user
+ * typed correctly.
+ */
+const TYPO_SCORE = 800;
+
+/**
+ * Whether `a` and the first `bLength` characters of `b` are at most one
+ * insertion, deletion, substitution, or adjacent transposition apart.
+ * Scans in place; no substring allocation on the per-keystroke path.
+ */
+function isOneEditAway(lowerA: string, lowerB: string, bLength: number): boolean {
+	const aLength = lowerA.length;
+	if (Math.abs(aLength - bLength) > 1) return false;
+	let i = 0;
+	while (i < aLength && i < bLength && lowerA.charCodeAt(i) === lowerB.charCodeAt(i)) i += 1;
+	if (i === aLength && i === bLength) return true;
+	if (aLength === bLength) {
+		// A substitution at `i`, or a transposition of `i` and `i + 1`.
+		let rest = i + 1;
+		while (rest < aLength && lowerA.charCodeAt(rest) === lowerB.charCodeAt(rest)) rest += 1;
+		if (rest === aLength) return true;
+		if (i + 1 >= aLength) return false;
+		if (lowerA.charCodeAt(i) !== lowerB.charCodeAt(i + 1)) return false;
+		if (lowerA.charCodeAt(i + 1) !== lowerB.charCodeAt(i)) return false;
+		rest = i + 2;
+		while (rest < aLength && lowerA.charCodeAt(rest) === lowerB.charCodeAt(rest)) rest += 1;
+		return rest === aLength;
+	}
+	// One side has a single extra character at `i`; every later character must
+	// line up with its counterpart in the longer side.
+	const aIsShorter = aLength < bLength;
+	const shorterLength = aIsShorter ? aLength : bLength;
+	let rest = i;
+	while (rest < shorterLength) {
+		const shortChar = aIsShorter ? lowerA.charCodeAt(rest) : lowerB.charCodeAt(rest);
+		const longChar = aIsShorter ? lowerB.charCodeAt(rest + 1) : lowerA.charCodeAt(rest + 1);
+		if (shortChar !== longChar) return false;
+		rest += 1;
+	}
+	return rest === shorterLength;
+}
+
+/**
+ * One-typo match against the candidate's leading text. Compares prefix lengths
+ * q-1, q, q+1 so a missing, extra, or swapped character still reaches the
+ * intended name (`guuded` → `guided-goal`, `modle` → `model`).
+ */
+function scoreTypoMatch(lowerPrefix: string, lowerTarget: string): number {
+	const queryLength = lowerPrefix.length;
+	if (queryLength < TYPO_MIN_QUERY_LENGTH) return 0;
+	const minLength = Math.max(1, queryLength - 1);
+	const maxLength = Math.min(lowerTarget.length, queryLength + 1);
+	for (let length = minLength; length <= maxLength; length += 1) {
+		if (isOneEditAway(lowerPrefix, lowerTarget, length)) return TYPO_SCORE;
+	}
+	return 0;
+}
+
+/**
+ * Command-name tier: exact, prefix, subsequence, then one typo. Descriptions
+ * keep {@link scoreCommandTextMatch} so a typo never makes every long
+ * description match.
+ */
+function scoreCommandNameMatch(lowerPrefix: string, lowerTarget: string): number {
+	return Math.max(scoreCommandTextMatch(lowerPrefix, lowerTarget), scoreTypoMatch(lowerPrefix, lowerTarget));
+}
+
 function buildSlashCommandCompletions(
 	commands: CommandEntry[],
 	lowerPrefix: string,
@@ -437,10 +510,10 @@ function buildSlashCommandCompletions(
 						? 950
 						: isSkillCommand
 							? Math.max(
-									scoreCommandTextMatch(lowerPrefix, name.toLowerCase()),
+									scoreCommandNameMatch(lowerPrefix, name.toLowerCase()),
 									skillBareNameBreakoutTier(lowerPrefix, name.slice(SKILL_NAMESPACE.length).toLowerCase()),
 								)
-							: scoreCommandTextMatch(lowerPrefix, name.toLowerCase());
+							: scoreCommandNameMatch(lowerPrefix, name.toLowerCase());
 				const lowerDesc = staticDesc.toLowerCase();
 				const descScore =
 					lowerDesc && subsequenceMatch(lowerPrefix, lowerDesc)
@@ -465,7 +538,7 @@ function buildSlashCommandCompletions(
 				if (lowerPrefix.length > 0) {
 					for (const alias of getCommandAliases(cmd)) {
 						if (alias === name) continue;
-						const aliasScore = scoreCommandTextMatch(lowerPrefix, alias.toLowerCase());
+						const aliasScore = scoreCommandNameMatch(lowerPrefix, alias.toLowerCase());
 						if (aliasScore === 0) continue;
 						// An alias can match even when the description outranks it; Enter
 						// must still accept the command rather than submit the raw query.
@@ -508,11 +581,15 @@ function hasPromptTextBeforeSlash(
 
 export const SKILL_NAMESPACE = "skill:";
 
-/** Exact/leading-prefix tier for ordinary command names and aliases. */
+/**
+ * Exact, leading-prefix, or one-typo tier for ordinary command names and
+ * aliases. The typo tier is included so a typo-matched builtin still keeps
+ * the skill popup command-first, just like a prefix tie (#18891).
+ */
 function commandBreakoutTier(lowerPrefix: string, lowerTarget: string): number {
 	if (lowerPrefix === lowerTarget) return 1000;
 	if (lowerTarget.startsWith(lowerPrefix)) return 900;
-	return 0;
+	return scoreTypoMatch(lowerPrefix, lowerTarget);
 }
 
 /**
@@ -543,7 +620,7 @@ function skillBareNameBreakoutTier(lowerPrefix: string, lowerBareName: string): 
 		if (lowerBareName.startsWith(lowerPrefix, segmentStart)) return 900;
 	}
 
-	return 0;
+	return scoreTypoMatch(lowerPrefix, lowerBareName);
 }
 
 /**
@@ -616,7 +693,7 @@ export function midPromptSkillTokenMatches(lowerToken: string, name: string, des
 	if (SKILL_NAMESPACE.startsWith(lowerToken)) return true;
 	const lowerName = name.toLowerCase();
 	if (lowerToken.startsWith(SKILL_NAMESPACE)) {
-		if (scoreCommandTextMatch(lowerToken, lowerName) > 0) return true;
+		if (scoreCommandNameMatch(lowerToken, lowerName) > 0) return true;
 		return !!description && scoreCommandTextMatch(lowerToken, description.toLowerCase()) > 0;
 	}
 	return (

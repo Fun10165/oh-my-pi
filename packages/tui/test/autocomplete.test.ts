@@ -1251,4 +1251,44 @@ describe("trySyncSlashCompletion", () => {
 		expect(provider.getInlineHint(["/onboarding pro"], 0, "/onboarding pro".length)).toBe("viders");
 		expect(provider.getInlineHint(["  /onboarding pro"], 0, "  /onboarding pro".length)).toBe("viders");
 	});
+
+	it("matches a command name with one substituted character", () => {
+		const provider = new CombinedAutocompleteProvider(
+			[{ name: "guided-goal", description: "Toggle goal mode" }],
+			"/tmp",
+		);
+		const result = provider.trySyncSlashCompletion("/guuded");
+		expect(result?.items.map(item => item.value)).toEqual(["guided-goal"]);
+	});
+
+	it("matches a command name with one transposed character", () => {
+		const provider = new CombinedAutocompleteProvider(
+			[{ name: "guided-goal", description: "Toggle goal mode" }],
+			"/tmp",
+		);
+		const result = provider.trySyncSlashCompletion("/guidde");
+		expect(result?.items.map(item => item.value)).toEqual(["guided-goal"]);
+	});
+
+	it("ranks equal one-typo names by usage", () => {
+		const provider = new CombinedAutocompleteProvider(
+			[
+				{ name: "modelpreset", description: "Save model presets" },
+				{ name: "model", description: "Switch model" },
+			],
+			"/tmp",
+			{ commandUsage: name => (name === "model" ? 10 : 0) },
+		);
+		const result = provider.trySyncSlashCompletion("/modle");
+		expect(result?.items.map(item => item.value).slice(0, 2)).toEqual(["model", "modelpreset"]);
+	});
+
+	it("applies the typo tier inside the skill namespace", () => {
+		const provider = new CombinedAutocompleteProvider(
+			[{ name: "skill:guided-concept-learning", description: "Learn a concept" }],
+			"/tmp",
+		);
+		const result = provider.trySyncSlashCompletion("/skill:guuded");
+		expect(result?.items.map(item => item.value)).toEqual(["skill:guided-concept-learning"]);
+	});
 });
