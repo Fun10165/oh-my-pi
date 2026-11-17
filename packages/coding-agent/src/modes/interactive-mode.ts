@@ -6232,7 +6232,6 @@ export class InteractiveMode implements InteractiveModeContext {
 				? await this.session.goalRuntime.resumeGoal()
 				: await this.session.goalRuntime.createGoal({
 						objective: options.objective ?? "",
-						tokenBudget: options.tokenBudget,
 					});
 			await this.session.setActiveToolsByName(goalTools);
 		} catch (error) {
@@ -6248,12 +6247,6 @@ export class InteractiveMode implements InteractiveModeContext {
 			throw error;
 		}
 		this.goalModePaused = false;
-		const state = options.resume
-			? await this.session.goalRuntime.resumeGoal()
-			: await this.session.goalRuntime.createGoal({
-					objective: options.objective ?? "",
-				});
-		await this.session.setActiveToolsByName(goalTools);
 		this.session.setGoalModeState(state);
 		this.goalModeEnabled = true;
 		this.#resetGoalContinuationSuppression();
@@ -6280,7 +6273,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		paused?: boolean;
 		reason?: "completed" | "paused" | "dropped";
 	}): Promise<void> {
-		using _hold = this.#holdModeChanges();
 		// Not gated on goalModeEnabled: a pause's goal_updated clears that flag
 		// before this runs, which used to leave the goal tool active.
 		await this.#removeGoalToolPreservingRoster();
