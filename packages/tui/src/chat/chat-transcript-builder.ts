@@ -12,7 +12,7 @@
  * component reuse could.
  */
 import type { AgentMessage, AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Usage } from "@oh-my-pi/pi-ai";
+import type { Usage } from "@oh-my-pi/pi-ai";
 import { type Component, type TUI } from "../tui";
 import type { AdvisorMessageDetails } from "./messages";
 import { COLLAB_PROMPT_MESSAGE_TYPE, type CollabPromptDetails } from "./messages";

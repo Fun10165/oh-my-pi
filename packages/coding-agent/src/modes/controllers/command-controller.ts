@@ -2323,7 +2323,6 @@ export class CommandController {
 		if (!background) await this.ctx.flushCompactionQueue({ willRetry: false });
 		return outcome;
 	}
-
 }
 
 const BAR_WIDTH_MAX = 24;
