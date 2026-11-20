@@ -2749,7 +2749,6 @@ export class EventController {
 				this.ctx.showStatus("Auto-shake completed");
 			}
 		} else if (event.result) {
-
 			this.ctx.rebuildChatFromMessages({ reuseSettledComponents: true });
 			// The rebuild reseeds the live baseline from the last replayed assistant
 			// message, which can be the kept pre-compaction turn. Drop it again so
